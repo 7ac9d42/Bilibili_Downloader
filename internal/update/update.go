@@ -1,8 +1,8 @@
 package update
 
 import (
-	"Bilibili_Downloader/internal/toolkit"
 	"Bilibili_Downloader/pkg/config"
+	"Bilibili_Downloader/pkg/toolkit"
 	"encoding/json"
 	"fmt"
 	"github.com/Masterminds/semver/v3"

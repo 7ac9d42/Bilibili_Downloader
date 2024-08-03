@@ -1,7 +1,7 @@
 package config
 
 import (
-	"Bilibili_Downloader/internal/toolkit"
+	"Bilibili_Downloader/pkg/toolkit"
 	"encoding/json"
 	"fmt"
 	"log"

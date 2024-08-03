@@ -1,4 +1,4 @@
-package toolkit
+package data_struct
 
 type VideoInfoResponse struct {
 	Data VideoData `json:"data"`
@@ -40,7 +40,7 @@ type Episode struct {
 
 /*
 //新版简介，留档以备不时之需
-type DescV2 struct {
+type DescV2 data_struct {
 	BizID   *int64  `json:"biz_id,omitempty"`
 	RawText *string `json:"raw_text,omitempty"`
 	Type    *int64  `json:"type,omitempty"`

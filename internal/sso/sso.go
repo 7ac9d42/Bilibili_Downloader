@@ -1,9 +1,9 @@
 package sso
 
 import (
-	"Bilibili_Downloader/internal/toolkit"
 	"Bilibili_Downloader/pkg/config"
 	"Bilibili_Downloader/pkg/httpclient"
+	"Bilibili_Downloader/pkg/toolkit"
 	"encoding/json"
 	"fmt"
 	"io"

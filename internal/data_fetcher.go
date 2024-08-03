@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"Bilibili_Downloader/internal/toolkit"
 	"Bilibili_Downloader/pkg/httpclient"
+	"Bilibili_Downloader/pkg/toolkit"
+	"Bilibili_Downloader/pkg/toolkit/data_struct"
 	"encoding/json"
 	"fmt"
 	"github.com/cheggaaa/pb/v3"
@@ -170,7 +171,7 @@ func DownloadFile(urlVideo string, urlAudio string, filepath string) error {
 func ProcessResponse(data []byte, flag int) (interface{}, error) {
 	var err error
 	if flag == 0 {
-		var response toolkit.VideoInfoResponse
+		var response data_struct.VideoInfoResponse
 		err = json.Unmarshal(data, &response)
 		if err != nil {
 			return nil, fmt.Errorf("视频信息解组失败: %w", err)
@@ -179,7 +180,7 @@ func ProcessResponse(data []byte, flag int) (interface{}, error) {
 		log.Println("视频信息数据解组正常")
 		return &response, nil
 	} else if flag == 1 {
-		var response toolkit.DownloadInfoResponse
+		var response data_struct.DownloadInfoResponse
 		err = json.Unmarshal(data, &response)
 		if err != nil {
 			return nil, fmt.Errorf("下载信息解组失败: %w", err)

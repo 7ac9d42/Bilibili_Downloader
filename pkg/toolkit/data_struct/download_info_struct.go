@@ -1,4 +1,4 @@
-package toolkit
+package data_struct
 
 type SegmentBase struct {
 	Initialization string `json:"Initialization"`
