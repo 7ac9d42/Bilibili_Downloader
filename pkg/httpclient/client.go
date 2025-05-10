@@ -41,16 +41,15 @@ func Init() bool {
 
 		// 创建HTTP客户端，设置超时
 		client = &http.Client{
-			Jar:     jar,
-			Timeout: 30 * time.Second,
+			Jar: jar,
 		}
 		initialized = true
 	})
 	return success
 }
 
-// ChangeClinet 修改全局HTTP客户端
-func ChangeClinet(newClient *http.Client) {
+// ChangeClient 修改全局HTTP客户端
+func ChangeClient(newClient *http.Client) {
 	client = newClient
 	initialized = true
 }

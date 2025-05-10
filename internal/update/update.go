@@ -149,7 +149,7 @@ func CheckAndUpdate() (int, string) {
 		return 0, ""
 	} else {
 		fmt.Printf("发现新版本，当前版本: %s，最新版本: %s\n", currentConfig.CurrentVersion, latestVersion)
-		fmt.Print("是否下载更新? (y/n): ")
+		fmt.Print("是否下载更新? (Y/n): ")
 		if toolkit.YesOrNo() {
 			if newProgramName, err := downloadUpdate(downloadURL, latestVersion); err != nil {
 				log.Println("更新失败:", err)

@@ -90,7 +90,7 @@ func HandleQRCodeLogin() error {
 		return fmt.Errorf("创建 cookie jar 失败: %v", err)
 	}
 	client := &http.Client{Jar: jar}
-	httpclient.ChangeClinet(client)
+	httpclient.ChangeClient(client)
 
 	token, qrURL, err := RequestQRCode(client)
 	if err != nil {
