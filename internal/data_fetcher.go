@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 func CatchData(Url string) ([]byte, error) {
@@ -161,6 +162,9 @@ func DownloadFile(urlVideo string, urlAudio string, filepath string) error {
 	}
 
 	bar.Finish()
+	for !bar.IsFinished() {
+		time.Sleep(500 * time.Millisecond)
+	}
 
 	toolkit.ClearScreen()
 	fmt.Println("下载完毕！")
