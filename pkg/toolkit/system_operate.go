@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
+// CheckAndCreateCacheDir 检查并创建下载缓存目录
 func CheckAndCreateCacheDir() error {
 	// 获取当前工作目录
 	currentDir, err := os.Getwd()
@@ -55,25 +54,7 @@ func RemoveCacheDir() error {
 	return nil
 }
 
-func ClearScreen() {
-	switch runtime.GOOS {
-	case "windows":
-		cmd := exec.Command("cmd", "/c", "cls")
-		cmd.Stdout = os.Stdout
-		if err := cmd.Run(); err != nil {
-			log.Println("清屏命令执行失败：", err)
-		}
-	case "linux", "darwin":
-		cmd := exec.Command("clear")
-		cmd.Stdout = os.Stdout
-		if err := cmd.Run(); err != nil {
-			log.Println("清屏命令执行失败：", err)
-		}
-	default:
-		log.Println("无法清屏，不支持的平台！")
-	}
-}
-
+// CheckAndCreateDir 检查并创建指定目录
 func CheckAndCreateDir(dir string) error {
 	configDir := dir
 

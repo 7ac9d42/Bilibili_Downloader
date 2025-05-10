@@ -15,20 +15,13 @@ import (
 )
 
 func CatchData(Url string) ([]byte, error) {
-
-	//client := &http.Client{}
 	client := httpclient.GetClient()
 	req, err := http.NewRequest("GET", Url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// 设置自定义请求头
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0")
-	req.Header.Set("Accept", "*/*")
-	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("Referer", "https://www.bilibili.com/")
-	req.Header.Set("Origin", "https://www.bilibili.com/")
+	toolkit.SetBilibiliHeaders(req)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -53,13 +46,13 @@ func CatchData(Url string) ([]byte, error) {
 	return body, nil
 }
 
-func DownloadFile(urlVideo string, urlAudio string, filepath string) error {
+// prepareDownloadPaths 准备下载文件路径
+func prepareDownloadPaths(filepath string) (string, string, error) {
 	var filepath1, filepath2 string
 
 	if filepath == "" {
 		if err := toolkit.CheckAndCreateCacheDir(); err != nil {
-			log.Println("检查并创建临时下载目录失败", err)
-			fmt.Println("检查并创建临时下载目录失败")
+			return "", "", fmt.Errorf("检查并创建临时下载目录失败: %w", err)
 		}
 		filepath1 = "./download_cache/audio_cache"
 		filepath2 = "./download_cache/video_cache"
@@ -74,91 +67,99 @@ func DownloadFile(urlVideo string, urlAudio string, filepath string) error {
 		filepath2 = filepath + "video_cache"
 	}
 
-	//client := &http.Client{}
-	client := httpclient.GetClient()
-	req1, err := http.NewRequest("GET", urlAudio, nil)
-	if err != nil {
-		return err
-	}
-	req2, err := http.NewRequest("GET", urlVideo, nil)
+	return filepath1, filepath2, nil
+}
+
+// downloadSingleFile 下载单个文件
+func downloadSingleFile(client *http.Client, url string, filePath string, bar *pb.ProgressBar) error {
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
 	}
 
-	// 设置自定义请求头
-	req1.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0")
-	req1.Header.Set("Accept", "*/*")
-	req1.Header.Set("Referer", "https://www.bilibili.com/vedio")
-	req1.Header.Set("Origin", "https://www.bilibili.com")
-	// 设置自定义请求头
-	req2.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0")
-	req2.Header.Set("Accept", "*/*")
-	req2.Header.Set("Referer", "https://www.bilibili.com/vedio")
-	req2.Header.Set("Origin", "https://www.bilibili.com")
+	toolkit.SetVideoHeaders(req)
 
-	resp1, err := client.Do(req1)
-	if err != nil {
-		return err
-	}
-	resp2, err := client.Do(req2)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := resp1.Body.Close(); err != nil {
-			log.Println("Close resp1.body失败：", err)
-		}
-		if err := resp2.Body.Close(); err != nil {
-			log.Println("Close resp2.body失败：", err)
+		if err := resp.Body.Close(); err != nil {
+			log.Println("Close resp.Body失败:", err)
 		}
 	}()
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("下载请求状态错误: %s", resp.Status)
+	}
+
+	out, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := out.Close(); err != nil {
+			log.Println("Close 文件失败:", err)
+		}
+	}()
+
+	return toolkit.DownloadAndTrackProgress(resp.Body, out, bar)
+}
+
+func DownloadFile(urlVideo string, urlAudio string, filepath string) error {
+	audioPath, videoPath, err := prepareDownloadPaths(filepath)
+	if err != nil {
+		log.Println(err)
+		fmt.Println(err)
+		return err
+	}
+
+	client := httpclient.GetClient()
+
 	fmt.Println("发送下载请求")
-	// 检查HTTP响应状态码
-	if resp1.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status of audio: %s", resp1.Status)
+
+	// 先获取文件大小以设置进度条
+	reqAudio, err := http.NewRequest("HEAD", urlAudio, nil)
+	if err != nil {
+		return err
 	}
-	if resp2.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status of video: %s", resp2.Status)
+	toolkit.SetVideoHeaders(reqAudio)
+
+	reqVideo, err := http.NewRequest("HEAD", urlVideo, nil)
+	if err != nil {
+		return err
 	}
+	toolkit.SetVideoHeaders(reqVideo)
+
+	respAudio, err := client.Do(reqAudio)
+	if err != nil {
+		return err
+	}
+	defer respAudio.Body.Close()
+
+	respVideo, err := client.Do(reqVideo)
+	if err != nil {
+		return err
+	}
+	defer respVideo.Body.Close()
+
+	totalSize := respAudio.ContentLength + respVideo.ContentLength
+	bar := pb.StartNew(int(totalSize))
+	bar.Set(pb.SIBytesPrefix, true)
 
 	fmt.Println("正在下载，请耐心等待...")
 	log.Println("视频下载开始")
 
-	// 创建文件
-	out1, err := os.Create(filepath1)
-	if err != nil {
-		return err
+	// 下载音频
+	if err := downloadSingleFile(client, urlAudio, audioPath, bar); err != nil {
+		return fmt.Errorf("音频下载失败: %w", err)
 	}
-	defer func() {
-		if err := out1.Close(); err != nil {
-			log.Println("Close out1文件失败：", err)
-		}
-	}()
 
-	// 创建文件
-	out2, err := os.Create(filepath2)
-	if err != nil {
-		return err
+	// 下载视频
+	if err := downloadSingleFile(client, urlVideo, videoPath, bar); err != nil {
+		return fmt.Errorf("视频下载失败: %w", err)
 	}
-	defer func() {
-		if err := out2.Close(); err != nil {
-			log.Println("Close out2文件失败：", err)
-		}
-	}()
 
-	totalSize := resp1.ContentLength + resp2.ContentLength
-	bar := pb.StartNew(int(totalSize))
-	bar.Set(pb.SIBytesPrefix, true)
-
-	err = toolkit.DownloadAndTrackProgress(resp1.Body, out1, bar)
-	if err != nil {
-		return err
-	}
-	err = toolkit.DownloadAndTrackProgress(resp2.Body, out2, bar)
-	if err != nil {
-		return err
-	}
 	bar.Finish()
 
 	toolkit.ClearScreen()

@@ -32,7 +32,7 @@ func ConfirmVideoExplanation(response *data_struct.VideoInfoResponse) {
 }
 
 func PrintDiversityInformationPart1(info *data_struct.VideoInfoResponse) {
-	fmt.Println("\n--------------------------------------------------")
+	fmt.Printf("\n--------------------------------------------------\n")
 	fmt.Println("分    P    列    表")
 	fmt.Println("--------------------------------------------------")
 	for i := range info.Data.UgcSeason.Sections[0].Episodes {
@@ -42,7 +42,7 @@ func PrintDiversityInformationPart1(info *data_struct.VideoInfoResponse) {
 }
 
 func PrintDiversityInformationPart2(info *data_struct.VideoInfoResponse) {
-	fmt.Println("\n--------------------------------------------------")
+	fmt.Printf("\n--------------------------------------------------\n")
 	fmt.Println("分    P    列    表")
 	fmt.Println("--------------------------------------------------")
 	for i := range info.Data.Pages {

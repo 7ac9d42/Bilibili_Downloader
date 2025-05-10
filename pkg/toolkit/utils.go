@@ -4,21 +4,12 @@ import (
 	"Bilibili_Downloader/pkg/toolkit/data_struct"
 	"bufio"
 	"fmt"
-	"github.com/cheggaaa/pb/v3"
-	"io"
 	"log"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 )
-
-// DownloadAndTrackProgress 下载并创建进度条
-func DownloadAndTrackProgress(src io.Reader, dst io.Writer, bar *pb.ProgressBar) error {
-	reader := bar.NewProxyReader(io.TeeReader(src, dst))
-	_, err := io.Copy(io.Discard, reader)
-	return err
-}
 
 func CatchAndCheckBVid() string {
 	//正则对BV号进行基本检查
@@ -114,31 +105,6 @@ func ObtainUserResolutionSelection(Default int64, title string, downloadInfoResp
 	return videoIndex, videoCode, resolutionDescription
 }
 
-func YesOrNo() bool {
-	reader := bufio.NewReader(os.Stdin)
-	var isContinue rune
-	for {
-		if _, err := fmt.Scanf("%c", &isContinue); err != nil {
-			_, _ = reader.ReadString('\n')
-			log.Println("读取输入发生错误", err)
-			fmt.Println("读取输入发生错误,请检查输入格式后重试，若问题依旧，请携带日志log文件向开发者反馈！")
-			continue
-		}
-		if isContinue != 'y' && isContinue != 'Y' && isContinue != 'n' && isContinue != 'N' {
-			_, _ = reader.ReadString('\n')
-			fmt.Println("输入错误，请检查输入(y/n)[不区分大小写]！")
-			continue
-		}
-		_, _ = reader.ReadString('\n')
-		break
-	}
-	if isContinue == 'y' || isContinue == 'Y' {
-		return true
-	} else {
-		return false
-	}
-}
-
 func GetMaps(info *data_struct.VideoInfoResponse, kind int64) map[string]map[string]int64 {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("Tip：若需下载所有分P，可直接输入序号0")
@@ -196,7 +162,7 @@ func GetMaps(info *data_struct.VideoInfoResponse, kind int64) map[string]map[str
 		}
 		return outerMap
 	} else {
-		fmt.Println("程序运行异常，请携带log日志联系开发者！")
+		fmt.Println("程序运行异常，请携带日志log文件联系开发者！")
 		log.Println("打印分P信息异常，不支持的kind值")
 	}
 	return nil
