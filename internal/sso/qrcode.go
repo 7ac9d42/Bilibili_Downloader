@@ -10,7 +10,7 @@ func DisplayQRCodeInTerminal(url string) error {
 	// 生成二维码
 	qr, err := qrcode.New(url, qrcode.Low)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("生成二维码失败: %w", err)
 	}
 
 	// 将二维码转换为 ASCII 字符

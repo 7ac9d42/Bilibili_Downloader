@@ -1,13 +1,13 @@
-package internal
+package toolkit
 
 import (
-	"Bilibili_Downloader/internal/toolkit"
+	"Bilibili_Downloader/pkg/toolkit/data_struct"
 	"fmt"
 	"time"
 )
 
 // 将 Response 结构体转换为控制台输出格式
-func responseToConsoleOutput(response *toolkit.VideoInfoResponse) {
+func responseToConsoleOutput(response *data_struct.VideoInfoResponse) {
 	video := response.Data
 	fmt.Println("--------------------------------------------------")
 	fmt.Printf("视频信息：\n")
@@ -26,13 +26,13 @@ func responseToConsoleOutput(response *toolkit.VideoInfoResponse) {
 	fmt.Println("--------------------------------------------------")
 }
 
-func ConfirmVideoExplanation(response *toolkit.VideoInfoResponse) {
+func ConfirmVideoExplanation(response *data_struct.VideoInfoResponse) {
 	// 直接在控制台输出数据
 	responseToConsoleOutput(response)
 }
 
-func PrintDiversityInformationPart1(info *toolkit.VideoInfoResponse) {
-	fmt.Println("\n--------------------------------------------------")
+func PrintDiversityInformationPart1(info *data_struct.VideoInfoResponse) {
+	fmt.Printf("\n--------------------------------------------------\n")
 	fmt.Println("分    P    列    表")
 	fmt.Println("--------------------------------------------------")
 	for i := range info.Data.UgcSeason.Sections[0].Episodes {
@@ -41,8 +41,8 @@ func PrintDiversityInformationPart1(info *toolkit.VideoInfoResponse) {
 	fmt.Println("--------------------------------------------------")
 }
 
-func PrintDiversityInformationPart2(info *toolkit.VideoInfoResponse) {
-	fmt.Println("\n--------------------------------------------------")
+func PrintDiversityInformationPart2(info *data_struct.VideoInfoResponse) {
+	fmt.Printf("\n--------------------------------------------------\n")
 	fmt.Println("分    P    列    表")
 	fmt.Println("--------------------------------------------------")
 	for i := range info.Data.Pages {
