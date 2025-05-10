@@ -8,9 +8,13 @@ import (
 	"Bilibili_Downloader/pkg/toolkit"
 	"Bilibili_Downloader/pkg/toolkit/data_struct"
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -40,6 +44,10 @@ func CatchVideoInfo(VideoInfoUrl string) (*data_struct.VideoInfoResponse, error)
 }
 
 func main() {
+	// 创建全局ctx用于中断操作
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// 创建一个新的读取器
 	reader := bufio.NewReader(os.Stdin)
 
@@ -51,13 +59,25 @@ func main() {
 	}()
 
 	defer func() {
-		fmt.Printf("程序执行完毕，请按Enter键退出...")
-		_, _ = reader.ReadString('\n')
+		if ctx.Err() == nil {
+			fmt.Printf("程序执行完毕，请按Enter键退出...")
+			_, _ = reader.ReadString('\n')
+		}
 		log.Println("程序执行完毕，正常退出")
 	}()
 
 	//提交清理计划
 	defer internal.CacheClean()
+
+	// 捕获系统信号，收到时取消ctx，退出前调用清理动作
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	go func() {
+		s := <-signalChan
+		log.Printf("收到信号：%v，开始退出程序...\n", s)
+		cancel()
+		_ = os.Stdin.Close()
+	}()
 
 	//初始化客户端
 	if !httpclient.Init() {
@@ -89,7 +109,7 @@ func main() {
 		if videoInfoResponse.Data.UgcSeason.Sections != nil || len(videoInfoResponse.Data.Pages) > 1 {
 			var part int64
 			//确认是否使用多分P选择/连续下载功能
-			fmt.Printf("检测到视频含有分P，是否使用多分P选择/连续下载功能？(y/n):")
+			fmt.Printf("检测到视频含有分P，是否使用多分P选择/连续下载功能？(Y/n):")
 			if toolkit.YesOrNo() {
 				Default = 0
 				if len(videoInfoResponse.Data.Pages) > 1 {
@@ -108,8 +128,8 @@ func main() {
 						videoInfoResponse.Data.Bvid: videoInfoResponse.Data.Cid,
 					},
 				}
+				//TODO:缺少在分P列表中对当前视频的突出显示
 			}
-			//TODO:缺少在分P列表中对当前视频的突出显示
 		} else {
 			actions = map[string]map[string]int64{
 				videoInfoResponse.Data.Title: {
@@ -118,8 +138,16 @@ func main() {
 			}
 		}
 
+		// 内层循环：遍历所有待下载的分P
 		for title, video := range actions {
+			// 检查ctx取消
+			if ctx.Err() != nil {
+				break
+			}
 			for bvid, cid := range video {
+				if ctx.Err() != nil {
+					return
+				}
 				//请求视频取流地址
 				DownloadURL := fmt.Sprintf("https://api.bilibili.com/x/player/wbi/playurl?bvid=%s&cid=%d&fnval=4048", bvid, cid)
 				data, err := internal.CatchData(DownloadURL)
@@ -145,11 +173,11 @@ func main() {
 
 				//处理用户选择
 				if len(downloadInfoResponse.Data.AcceptDescription) == 0 || downloadInfoResponse.Data.AcceptDescription[0] == `试看` {
-					log.Println("当前账号可能没有观看（下载）该视频的权限，无法获取视频下载地址.")
-					fmt.Println("\n当前账号可能没有观看（下载）该视频的权限，无法获取视频下载地址.")
+					log.Println("当前账号可能没有观看（下载）该视频的权限，无法获取视频下载地址")
+					fmt.Printf("\n当前账号可能没有观看（下载）该视频的权限，无法获取视频下载地址\n")
 				} else {
 					if Default == 0 {
-						fmt.Printf("当前为多分P下载模式，是否默认下载可获取的最高分辨率?(y/n)；")
+						fmt.Printf("当前为多分P下载模式，是否默认下载可获取的最高分辨率?(Y/n)")
 						if toolkit.YesOrNo() {
 							Default = 1
 						} else {
@@ -159,21 +187,32 @@ func main() {
 					videoIndex, _, resolutionDescription := toolkit.ObtainUserResolutionSelection(int64(Default), title, downloadInfoResponse)
 
 					//请求视频下载
-					if err := internal.DownloadFile(downloadInfoResponse.Data.Dash.Video[videoIndex].BackupURL[0], downloadInfoResponse.Data.Dash.Audio[0].BackupURL[0], ""); err != nil {
+					if err := internal.DownloadFile(ctx, downloadInfoResponse.Data.Dash.Video[videoIndex].BackupURL[0], downloadInfoResponse.Data.Dash.Audio[0].BackupURL[0], ""); err != nil {
+						if errors.Is(err, context.Canceled) {
+							log.Printf("下载终止：%s\n", err)
+							break
+						}
 						log.Printf("请求下载失败：%s\n", err)
 						fmt.Println("请求下载失败，请检查网络连接或前往log文件查看详情.")
+						fmt.Println("跳过当前视频，3s后继续下载下一个视频...")
+						time.Sleep(3 * time.Second)
+					} else {
+						//视频音频混流转码
+						fmt.Printf("开始视频转码：\n\n")
+						video_processing.Transcoding(title, resolutionDescription)
+						time.Sleep(500 * time.Millisecond)
 					}
-
-					//视频音频混流转码
-					fmt.Printf("开始视频转码：\n\n")
-					video_processing.Transcoding(title, resolutionDescription)
-					time.Sleep(500 * time.Millisecond)
 				}
 			}
 		}
 
-		fmt.Printf("是否继续下载其他视频？(y/n):")
+		// 检查ctx状态，避免进入下一次循环
+		if ctx.Err() != nil {
+			break
+		}
+		fmt.Printf("是否继续下载其他视频？(Y/n):")
 		if isContinue := toolkit.YesOrNo(); isContinue {
+			toolkit.ResetHDRState() // 重置HDR忽略状态
 			toolkit.ClearScreen()
 			continue
 		} else {

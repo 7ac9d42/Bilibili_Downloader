@@ -21,15 +21,14 @@ func ClearScreen() {
 	_ = cmd.Run()
 }
 
-// YesOrNo 读取用户输入(y/n)
+// YesOrNo 读取用户输入(Y/n)
 func YesOrNo() bool {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
 		input = strings.ToLower(input)
-
-		if input == "y" || input == "yes" {
+		if input == "" || input == "y" || input == "yes" {
 			return true
 		} else if input == "n" || input == "no" {
 			return false

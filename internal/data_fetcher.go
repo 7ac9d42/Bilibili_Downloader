@@ -4,6 +4,7 @@ import (
 	"Bilibili_Downloader/pkg/httpclient"
 	"Bilibili_Downloader/pkg/toolkit"
 	"Bilibili_Downloader/pkg/toolkit/data_struct"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/cheggaaa/pb/v3"
@@ -72,8 +73,8 @@ func prepareDownloadPaths(filepath string) (string, string, error) {
 }
 
 // downloadSingleFile 下载单个文件
-func downloadSingleFile(client *http.Client, url string, filePath string, bar *pb.ProgressBar) error {
-	req, err := http.NewRequest("GET", url, nil)
+func downloadSingleFile(ctx context.Context, client *http.Client, url string, filePath string, bar *pb.ProgressBar) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return err
 	}
@@ -107,7 +108,7 @@ func downloadSingleFile(client *http.Client, url string, filePath string, bar *p
 	return toolkit.DownloadAndTrackProgress(resp.Body, out, bar)
 }
 
-func DownloadFile(urlVideo string, urlAudio string, filepath string) error {
+func DownloadFile(ctx context.Context, urlVideo string, urlAudio string, filepath string) error {
 	audioPath, videoPath, err := prepareDownloadPaths(filepath)
 	if err != nil {
 		log.Println(err)
@@ -119,14 +120,14 @@ func DownloadFile(urlVideo string, urlAudio string, filepath string) error {
 
 	fmt.Println("发送下载请求")
 
-	// 先获取文件大小以设置进度条
-	reqAudio, err := http.NewRequest("HEAD", urlAudio, nil)
+	// 使用ctx创建HEAD请求
+	reqAudio, err := http.NewRequestWithContext(ctx, "HEAD", urlAudio, nil)
 	if err != nil {
 		return err
 	}
 	toolkit.SetVideoHeaders(reqAudio)
 
-	reqVideo, err := http.NewRequest("HEAD", urlVideo, nil)
+	reqVideo, err := http.NewRequestWithContext(ctx, "HEAD", urlVideo, nil)
 	if err != nil {
 		return err
 	}
@@ -151,21 +152,27 @@ func DownloadFile(urlVideo string, urlAudio string, filepath string) error {
 	fmt.Println("正在下载，请耐心等待...")
 	log.Println("视频下载开始")
 
-	// 下载音频
-	if err := downloadSingleFile(client, urlAudio, audioPath, bar); err != nil {
+	if err := downloadSingleFile(ctx, client, urlAudio, audioPath, bar); err != nil {
 		return fmt.Errorf("音频下载失败: %w", err)
 	}
-
-	// 下载视频
-	if err := downloadSingleFile(client, urlVideo, videoPath, bar); err != nil {
+	if err := downloadSingleFile(ctx, client, urlVideo, videoPath, bar); err != nil {
 		return fmt.Errorf("视频下载失败: %w", err)
 	}
 
 	bar.Finish()
-	for !bar.IsFinished() {
+	for {
+		if bar.IsFinished() {
+			break
+		}
+		// 若检测到取消，清除进度条输出后直接退出循环
+		if ctx.Err() != nil {
+			bar.Finish()
+			continue
+		}
 		time.Sleep(500 * time.Millisecond)
 	}
 
+	// 清屏及提示信息
 	toolkit.ClearScreen()
 	fmt.Println("下载完毕！")
 	log.Println("视频下载成功")

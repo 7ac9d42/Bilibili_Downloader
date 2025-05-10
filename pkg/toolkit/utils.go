@@ -11,9 +11,19 @@ import (
 	"strings"
 )
 
+// 全局变量保存多分P下载过程中是否忽略HDR的选择
+var globalIgnoreHDRSet = false
+var globalIgnoreHDR = false
+
+// ResetHDRState 重置HDR忽略状态
+func ResetHDRState() {
+	globalIgnoreHDRSet = false
+	globalIgnoreHDR = false
+}
+
 func CatchAndCheckBVid() string {
 	//正则对BV号进行基本检查
-	BVCheak := regexp.MustCompile(`^BV[1-9A-HJ-NP-Za-km-z]{10}$`)
+	BECheck := regexp.MustCompile(`^BV[1-9A-HJ-NP-Za-km-z]{10}$`)
 	var BVid string
 	for {
 		fmt.Printf("请输入需要下载视频的BV号：")
@@ -23,7 +33,7 @@ func CatchAndCheckBVid() string {
 			log.Println("读取输入错误：", err)
 			continue
 		}
-		if BVCheak.MatchString(BVid) {
+		if BECheck.MatchString(BVid) {
 			break
 		} else {
 			ClearScreen()
@@ -31,6 +41,48 @@ func CatchAndCheckBVid() string {
 		}
 	}
 	return BVid
+}
+
+// 抽取HDR检测与逻辑处理函数
+func handleHDRIfNeeded(Default int64, choose int, effectiveDefinition []int, resolutions map[int]string) int {
+	videoCode := effectiveDefinition[choose]
+	resolutionDescription := resolutions[videoCode]
+	if Default == 1 && resolutionDescription == "HDR" {
+		// 如果已经记录过用户选择，直接复用
+		if globalIgnoreHDRSet {
+			if globalIgnoreHDR {
+				for i, code := range effectiveDefinition {
+					if resolutions[code] != "HDR" {
+						choose = i
+						return choose
+					}
+				}
+				fmt.Println("未找到其他非HDR画质选项，继续使用HDR画质")
+				return choose
+			} else {
+				return choose
+			}
+		}
+		// 未记录时询问用户，并记忆其选择
+		fmt.Printf("\n--------【请注意：HDR画质在不受支持的设备上播放将会有显著偏色现象】--------\n")
+		fmt.Printf("是否忽略HDR画质?(Y/n):")
+		if YesOrNo() {
+			globalIgnoreHDR = true
+			// 查找其他非HDR选项
+			for i, code := range effectiveDefinition {
+				if resolutions[code] != "HDR" {
+					choose = i
+					globalIgnoreHDRSet = true
+					return choose
+				}
+			}
+			fmt.Println("未找到其他非HDR画质选项，继续使用HDR画质")
+		} else {
+			globalIgnoreHDR = false
+		}
+		globalIgnoreHDRSet = true
+	}
+	return choose
 }
 
 // ObtainUserResolutionSelection 获取用户分辨率选择
@@ -78,13 +130,6 @@ func ObtainUserResolutionSelection(Default int64, title string, downloadInfoResp
 		choose = 0
 	}
 
-	var videoIndex int
-	for i := range downloadInfoResponse.Data.Dash.Video {
-		if downloadInfoResponse.Data.Dash.Video[i].ID == effectiveDefinition[choose] {
-			videoIndex = i
-		}
-	}
-
 	resolutions := map[int]string{
 		6:   "240P",
 		16:  "360P",
@@ -98,6 +143,17 @@ func ObtainUserResolutionSelection(Default int64, title string, downloadInfoResp
 		125: "HDR",
 		126: "杜比视界",
 		127: "8K超高清",
+	}
+
+	choose = handleHDRIfNeeded(Default, choose, effectiveDefinition, resolutions)
+
+	// 根据最终选择更新 videoIndex、videoCode 及分辨率描述
+	var videoIndex int
+	for i := range downloadInfoResponse.Data.Dash.Video {
+		if downloadInfoResponse.Data.Dash.Video[i].ID == effectiveDefinition[choose] {
+			videoIndex = i
+			break
+		}
 	}
 	videoCode := effectiveDefinition[choose]
 	resolutionDescription := resolutions[videoCode]
